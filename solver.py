@@ -53,10 +53,7 @@ def naked_twins(values):
     #Go through all the units from the unitlist
     for unit in unitlist:
         #Get all the potential twins i.e. box with 2 possible digits
-        potentialTwins= []
-        for elem in unit:
-            if len(values[elem]) == 2:
-                potentialTwins.append(elem)
+        potentialTwins= [elem for elem in unit if len(values[elem]) == 2]
         #Get the combinations of each possible twins
         twinCombinations = itertools.combinations(potentialTwins,2)
         #Iterate throught the combinations and see if their values match
@@ -67,10 +64,7 @@ def naked_twins(values):
             if values[twin1] == values[twin2]:
                 value = values[twin1]
                 #Get a list of elements that is in the unit and is not the twins
-                peersList = []
-                for elem in unit:
-                    if elem != twin1 and elem != twin2:
-                        peersList.append(elem)
+                peersList = [elem for elem in unit if elem != twin1 and elem != twin2]
                 #Go through each of their peers
                 for peer in peersList:
                         #Erase the values that is in the naked twins
