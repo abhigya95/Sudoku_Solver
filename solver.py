@@ -18,11 +18,11 @@ boxes = cross(rows, cols)
 row_units = [cross(r, cols) for r in rows]
 column_units = [cross(rows, c) for c in cols]
 square_units = [cross(rs, cs) for rs in ('ABC','DEF','GHI') for cs in ('123','456','789')]
-#Diagonal line: [A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8', 'I9']
-diagonal_unit_1 = [a+b for a,b in zip(rows,cols)]
-#Diagonal line: ['A9', 'B8', 'C7', 'D6', 'E5', 'F4', 'G3', 'H2', 'I1']
-diagonal_unit_2 = [a+b for a,b in zip(rows,reversed(cols))]
-unitlist = row_units + column_units + square_units + [diagonal_unit_1, diagonal_unit_2]
+#Diagonal units : [[A1', 'B2', 'C3', 'D4', 'E5', 'F6', 'G7', 'H8', 'I9'],
+                  #['A9', 'B8', 'C7', 'D6', 'E5', 'F4', 'G3', 'H2', 'I1']]
+diagonal_units = [[r+c for r,c in zip(rows,cols)], [r+c for r,c in zip(rows,cols[::-1])]]
+unitlist = row_units + column_units + square_units
+unitlist_diagonal = unitlist + diagonal_units
 units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
 peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
 
@@ -41,19 +41,24 @@ def assign_value(values, box, value):
         assignments.append(values.copy())
     return values
 
-def naked_twins(values):
+def naked_twins(values, diagonal):
     """Eliminate values using the naked twins strategy.
     Args:
         values(dict): a dictionary of the form {'box_name': '123456789', ...}
     Returns:
         the values dictionary with the naked twins eliminated from peers.
     """
-
+    unitlists = unitlist
+    if diagonal == 'Y':
+        unitlists = unitlist_diagonal
     # Find all instances of naked twins
     #Go through all the units from the unitlist
-    for unit in unitlist:
+    for unit in unitlists:
         #Get all the potential twins i.e. box with 2 possible digits
-        potentialTwins= [elem for elem in unit if len(values[elem]) == 2]
+        potentialTwins= []
+        for elem in unit:
+            if len(values[elem]) == 2:
+                potentialTwins.append(elem)
         #Get the combinations of each possible twins
         twinCombinations = itertools.combinations(potentialTwins,2)
         #Iterate throught the combinations and see if their values match
@@ -64,7 +69,10 @@ def naked_twins(values):
             if values[twin1] == values[twin2]:
                 value = values[twin1]
                 #Get a list of elements that is in the unit and is not the twins
-                peersList = [elem for elem in unit if elem != twin1 and elem != twin2]
+                peersList = []
+                for elem in unit:
+                    if elem != twin1 and elem != twin2:
+                        peersList.append(elem)
                 #Go through each of their peers
                 for peer in peersList:
                         #Erase the values that is in the naked twins
@@ -123,20 +131,23 @@ def eliminate(values):
             values = assign_value(values,peer,new_value)
     return values
 
-def only_choice(values):
+def only_choice(values,diagonal):
     """
     Go through all the units, and whenever there is a unit with a value that only fits in one box, assign the value to this box.
     Input: A sudoku in dictionary form.
     Output: The resulting sudoku in dictionary form.
     """
-    for unit in unitlist:
+    unitlists = unitlist
+    if diagonal == 'Y':
+        unitlists = unitlist_diagonal
+    for unit in unitlists:
         for digit in '123456789':
             dplaces = [box for box in unit if digit in values[box]]
             if len(dplaces) == 1:
                 values = assign_value(values,dplaces[0],digit)
     return values
 
-def reduce_puzzle(values):
+def reduce_puzzle(values,diagonal):
     stalled = False
     """
     Iterate eliminate() and only_choice(). If at some point, there is a box with no available values, return False.
@@ -151,9 +162,9 @@ def reduce_puzzle(values):
         # Use the Eliminate Strategy
         values = eliminate(values)
         # Use the Only Choice Strategy
-        values = only_choice(values)
+        values = only_choice(values,diagonal)
         # Use the Naked Twins Strategy
-        values = naked_twins(values)
+        values = naked_twins(values,diagonal)
         # Check how many boxes have a determined value, to compare
         solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
         # If no new values were added, stop the loop.
@@ -163,10 +174,10 @@ def reduce_puzzle(values):
             return False
     return values
 
-def search(values):
+def search(values,diagonal):
     # "Using depth-first search and propagation, create a search tree and solve the sudoku."
     # First, reduce the puzzle using the previous function
-    values = reduce_puzzle(values)
+    values = reduce_puzzle(values,diagonal)
     if values == False:
         return False
 
@@ -191,11 +202,11 @@ def search(values):
         new_sudo = values.copy()
         #new_sudo[our_box] = val
         assign_value(new_sudo, our_box, val)
-        perform = search(new_sudo)
+        perform = search(new_sudo,diagonal)
         if perform:
             return perform
 
-def solve(grid):
+def solve(grid,diagonal):
     """
     Find the solution to a Sudoku grid.
     Args:
@@ -207,17 +218,30 @@ def solve(grid):
     #Convert the grid to a dictionary
     values = grid_values(grid)
     #Reduce puzzle and perform DFS to get the results
-    return search(values)
+    return search(values,diagonal)
 
 if __name__ == '__main__':
-    diag_sudoku_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
-    display(solve(diag_sudoku_grid))
+    #Hardest sudoku of the world as told in telegraph.co.uk
+    #default_grid = '8..........36......7..9.2...5...7.......457.....1...3...1....68..85...1..9....4..'
 
+    default_grid = '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
+    puzzle = input('Enter the sudoku each row at a time and a "." for empty box. '
+                '\nFor exmaple: 8..........36......7..9.2...5...7.......457.....1...3...1....68..85...1..9....4..')
+    diagonal_check = input('Do you want it to be a diagonal sudoku? Enter Y/N: ')
+    visual = input("Do you want a GUI to see the computer's thinking process? Enter Y/N: " )
+
+    if puzzle == '':
+        puzzle = default_grid
     try:
-        from visualize import visualize_assignments
-        visualize_assignments(assignments)
-
-    except SystemExit:
-        pass
+        display(solve(puzzle,diagonal_check))
     except:
-        print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
+        print("Either your input is incorrect or there isn't a solution")
+    if visual == 'Y':
+        try:
+            from visualize import visualize_assignments
+            visualize_assignments(assignments)
+
+        except SystemExit:
+            pass
+        except:
+            print('We could not visualize your board due to a pygame issue. Not a problem! Check your console/terminal for the solution!')
